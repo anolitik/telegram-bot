@@ -1,14 +1,34 @@
+import os
 import random
 import asyncio
-from telegram import Bot
+import logging
+from telegram import Bot, ChatMember
 from telegram.error import TimedOut, NetworkError
 
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s"
+)
+
+# Резервные анекдоты на случай проблем с файлом
+DEFAULT_ANECDOTES = [
+    "Анекдот 1: Шла бабка через болото...",
+    "Анекдот 2: Встречаются два друга...",
+    "Анекдот 3: Заходит мужик в бар..."
+]
+
 # Настройки
-TELEGRAM_BOT_TOKEN = '7597993035:AAHDu-SSrBqQK_rvokwLikv5L1Vf34llXro'  # Замените на ваш токен
-CHANNEL_ID = '@ortxt'  # Замените на имя вашего канала (начинается с @)
-ANEC_DOT_FILE = r'anekdots.txt'  # Путь к файлу с анекдотами
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+CHANNEL_ID = os.getenv('CHANNEL_ID')
+ANEC_DOT_FILE = 'anekdots.txt'  # Относительный путь к файлу с анекдотами
 POSTS_PER_DAY = 10  # Количество анекдотов в день
 POST_INTERVAL = 86400 // POSTS_PER_DAY  # Интервал между публикациями (в секундах)
+
+# Проверка переменных окружения
+if not TELEGRAM_BOT_TOKEN or not CHANNEL_ID:
+    logging.error("Ошибка: не установлены переменные окружения TELEGRAM_BOT_TOKEN или CHANNEL_ID.")
+    exit(1)
 
 # Чтение анекдотов из файла
 def load_anecdotes(file_path):
@@ -16,14 +36,23 @@ def load_anecdotes(file_path):
         with open(file_path, 'r', encoding='utf-8') as file:
             content = file.read()
         # Разделяем анекдоты по двойным переносам строк (пустым строкам)
-        anecdotes = content.split('\n\n')
-        # Убираем лишние пробелы и пустые строки
-        return [a.strip() for a in anecdotes if a.strip()]
+        return [a.strip() for a in content.split('\n\n') if a.strip()]
     except FileNotFoundError:
-        print(f"Ошибка: файл '{file_path}' не найден.")
-        exit(1)
+        logging.warning(f"Файл '{file_path}' не найден. Использую резервные анекдоты.")
+        return DEFAULT_ANECDOTES
     except Exception as e:
-        print(f"Произошла ошибка при чтении файла: {e}")
+        logging.error(f"Ошибка при чтении файла: {e}")
+        return DEFAULT_ANECDOTES
+
+# Проверка прав бота
+async def check_bot_permissions(bot, channel_id):
+    try:
+        member = await bot.get_chat_member(chat_id=channel_id, user_id=bot.id)
+        if member.status != ChatMember.ADMINISTRATOR:
+            logging.error("Бот не является администратором канала.")
+            exit(1)
+    except Exception as e:
+        logging.error(f"Ошибка при проверке прав бота: {e}")
         exit(1)
 
 # Асинхронная публикация анекдотов
@@ -34,21 +63,24 @@ async def post_anecdotes(bot, channel_id, anecdotes):
             anecdote = anecdotes[i % len(anecdotes)]  # Берем анекдот по кругу
             try:
                 await bot.send_message(chat_id=channel_id, text=anecdote)  # Асинхронная отправка
-                print(f"Опубликован анекдот: {anecdote}")
+                logging.info(f"Опубликован анекдот: {anecdote}")
             except TimedOut:
-                print("Ошибка: превышено время ожидания. Повторная попытка...")
+                logging.warning("Ошибка: превышено время ожидания. Повторная попытка...")
             except NetworkError as e:
-                print(f"Сетевая ошибка: {e}. Повторная попытка...")
+                logging.error(f"Сетевая ошибка: {e}. Повторная попытка...")
             except Exception as e:
-                print(f"Неизвестная ошибка: {e}")
+                logging.error(f"Неизвестная ошибка: {e}")
             finally:
                 await asyncio.sleep(POST_INTERVAL)  # Ждем перед следующей публикацией
 
+# Основная функция
 async def main():
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    anecdotes = load_anecdotes(ANEC_DOT_FILE)
-    print("Бот запущен. Начинаю публикацию анекдотов...")
+    await check_bot_permissions(bot, CHANNEL_ID)  # Проверяем права бота
+    anecdotes = load_anecdotes(ANEC_DOT_FILE)  # Загружаем анекдоты
+    logging.info("Бот запущен. Начинаю публикацию анекдотов...")
     await post_anecdotes(bot, CHANNEL_ID, anecdotes)
 
+# Точка входа
 if __name__ == "__main__":
     asyncio.run(main())
