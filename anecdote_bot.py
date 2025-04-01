@@ -76,8 +76,21 @@ async def post_anecdotes(bot, channel_id, anecdotes):
 # Основная функция
 async def main():
     bot = Bot(token=TELEGRAM_BOT_TOKEN)
-    await check_bot_permissions(bot, CHANNEL_ID)  # Проверяем права бота
-    anecdotes = load_anecdotes(ANEC_DOT_FILE)  # Загружаем анекдоты
+    
+    # Инициализация бота
+    try:
+        await bot.initialize()
+        logging.info("Бот успешно инициализирован.")
+    except Exception as e:
+        logging.error(f"Ошибка при инициализации бота: {e}")
+        exit(1)
+
+    # Проверяем права бота
+    await check_bot_permissions(bot, CHANNEL_ID)
+
+    # Загружаем анекдоты
+    anecdotes = load_anecdotes(ANEC_DOT_FILE)
+
     logging.info("Бот запущен. Начинаю публикацию анекдотов...")
     await post_anecdotes(bot, CHANNEL_ID, anecdotes)
 
