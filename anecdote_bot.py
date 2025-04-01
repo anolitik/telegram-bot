@@ -6,7 +6,7 @@ from telegram.error import TimedOut, NetworkError
 # Настройки
 TELEGRAM_BOT_TOKEN = '7597993035:AAHDu-SSrBqQK_rvokwLikv5L1Vf34llXro'  # Замените на ваш токен
 CHANNEL_ID = '@ortxt'  # Замените на имя вашего канала (начинается с @)
-ANEC_DOT_FILE = r'C:\Users\Username\Desktop\Ортекст\anekdots.txt'  # Путь к файлу с анекдотами
+ANEC_DOT_FILE = r'anekdots.txt'  # Путь к файлу с анекдотами
 POSTS_PER_DAY = 10  # Количество анекдотов в день
 POST_INTERVAL = 86400 // POSTS_PER_DAY  # Интервал между публикациями (в секундах)
 
